@@ -1,0 +1,36 @@
+# Example structure for data/private/experience.yaml (fake data).
+# Copy to data/private/experience.yaml and replace with real content.
+# Plain text only (no bold). Use ">-" for long text so colons don't break YAML.
+
+professional_summary: >-
+  Engineer with N years of experience building example systems: pipelines, APIs, and monitoring.
+
+technical_skills:
+  Languages: Python, SQL
+  Cloud: AWS, Docker
+
+# Each key matches a <KEY> placeholder in data/resume_template.md
+WORK_EXPERIENCE_2_EMPLOYER_2:
+  - id: w22_01
+    text: >-
+      Built an example service that processes example data for example users.
+  - id: w22_02
+    text: >-
+      Reduced example job runtime by 40% by batching example queries.
+
+WORK_EXPERIENCE_1_EMPLOYER_2:
+  - id: w12_01
+    text: >-
+      Created an example dashboard comparing example metrics across periods.
+
+WORK_EXPERIENCE_1_EMPLOYER_1:
+  - id: w11_01
+    text: >-
+      Automated an example weekly report.
+
+projects:
+  - id: project_1
+    name: Example Project
+    description: >-
+      Designed and built an example project that demonstrates the structure.
+    tech_stack: Python, FastAPI

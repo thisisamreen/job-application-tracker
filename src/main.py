@@ -31,6 +31,7 @@
 import csv
 import os
 from datetime import datetime
+from difflib import SequenceMatcher
 from openpyxl import Workbook
 import smtplib
 from email.message import EmailMessage
@@ -59,6 +60,60 @@ def init_file():
 
 
 # ============================================================
+# HELPERS — Clean text, read rows, fuzzy match
+# ============================================================
+
+def clean(text):
+    # Strip leading/trailing spaces and collapse repeated inner spaces
+    return " ".join(text.split())
+
+
+def read_jobs():
+    # Returns (header, rows) with every cell cleaned and blank rows skipped
+    with open("data/jobs.csv", "r", newline="") as file:
+        reader = csv.reader(file)
+        header = [clean(cell) for cell in next(reader, [])]
+        rows = [[clean(cell) for cell in row] for row in reader if any(cell.strip() for cell in row)]
+    return header, rows
+
+
+def fuzzy_match(query, value, threshold=0.75):
+    # Case-insensitive match that allows partial text ("Mann", "Trad")
+    # and small spelling mistakes ("Manai", "Aplied")
+    query = clean(query).lower()
+    value = clean(value).lower()
+
+    if not query:
+        return False
+    if query in value:
+        return True
+    if SequenceMatcher(None, query, value).ratio() >= threshold:
+        return True
+
+    # Compare against each word, and against word prefixes of the same length,
+    # so a misspelled partial word still matches
+    for word in value.split():
+        if SequenceMatcher(None, query, word).ratio() >= threshold:
+            return True
+        if len(query) >= 3 and SequenceMatcher(None, query, word[:len(query)]).ratio() >= threshold:
+            return True
+    return False
+
+
+def examples(rows, column, limit=5):
+    # Unique existing values for a column, used as help text
+    seen = []
+    for row in rows:
+        if len(row) > column and row[column] and row[column] not in seen:
+            seen.append(row[column])
+    return ", ".join(seen[:limit])
+
+
+def print_job(row):
+    print(f"Company: {row[0]}, Role: {row[1]}, Location: {row[2]}, Status: {row[3]}, Date: {row[4]}")
+
+
+# ============================================================
 # FUNCTION 2 — Add Job Application
 # Story: User applied to Amazon for Data Analyst role
 # ============================================================
@@ -70,10 +125,10 @@ def add_job(company, role, location, status):
         writer = csv.writer(file)
 
         writer.writerow([
-            company,
-            role,
-            location,
-            status,
+            clean(company),
+            clean(role),
+            clean(location),
+            clean(status),
             datetime.now().strftime("%Y-%m-%d")
         ])
 
@@ -86,19 +141,11 @@ def add_job(company, role, location, status):
 
 def view_jobs():
 
-    with open("data/jobs.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader, None)
-        print("\nYour Job Applications:")
+    _, rows = read_jobs()
+    print("\nYour Job Applications:")
 
-        for row in reader:
-            print(
-                f"Company: {row[0]}, "
-                f"Role: {row[1]}, "
-                f"Location: {row[2]}, "
-                f"Status: {row[3]}, "
-                f"Date: {row[4]}"
-            )
+    for row in rows:
+        print_job(row)
 
 
 # ============================================================
@@ -108,28 +155,35 @@ def view_jobs():
 
 def update_job_status():
 
-    company_name = input("Enter company name: ")
-    updated_rows = []
-    found = False
+    header, rows = read_jobs()
+    print(f"(e.g. {examples(rows, 0)})")
+    company_name = clean(input("Enter company name: "))
+    matches = [row for row in rows if fuzzy_match(company_name, row[0])]
 
-    with open("data/jobs.csv", "r") as file:
-        reader = csv.reader(file)
-        header = next(reader)
-        updated_rows.append(header)
-
-        for row in reader:
-            if row[0].lower() == company_name.lower():
-                row[3] = input("Enter new status: ")
-                found = True
-            updated_rows.append(row)
-
-    if not found:
+    if not matches:
         print("❌ Company not found")
         return
 
+    for i, row in enumerate(matches, start=1):
+        print(f"{i}. ", end="")
+        print_job(row)
+
+    if len(matches) > 1:
+        pick = clean(input("Choose job number to update: "))
+        if not pick.isdigit() or not 1 <= int(pick) <= len(matches):
+            print("❌ Invalid choice")
+            return
+        target = matches[int(pick) - 1]
+    else:
+        target = matches[0]
+
+    print(f"(e.g. {examples(rows, 3)})")
+    target[3] = clean(input("Enter new status: "))
+
     with open("data/jobs.csv", "w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerows(updated_rows)
+        writer.writerow(header)
+        writer.writerows(rows)
     print("✅ Status updated successfully")
 
 
@@ -139,26 +193,38 @@ def update_job_status():
 
 def search_job():
 
+    _, rows = read_jobs()
+
     print("\nSearch Job By:")
     print("1. Company Name")
     print("2. Status")
 
-    choice = input("Choose option: ")
-    with open("data/jobs.csv", "r") as file:
+    choice = clean(input("Choose option: "))
 
-        reader = csv.reader(file)
-        next(reader, None)
+    if choice == "1":
+        print(f"Tip: partial names and small typos work. e.g. {examples(rows, 0)}")
+        query = clean(input("Enter company name: "))
+        matches = [row for row in rows if fuzzy_match(query, row[0])]
 
-        for row in reader:
-            if choice == "1":
-                company_name = input("Enter company name: ")
-                if row[0].lower() == company_name.lower():
-                    print(row)
+    elif choice == "2":
+        print(f"Tip: e.g. {examples(rows, 3)}")
+        query = clean(input("Enter status: "))
+        # Exact status first so "Applied" doesn't also return "Not Applied Yet";
+        # fall back to fuzzy matching for typos
+        matches = [row for row in rows if row[3].lower() == query.lower()]
+        if not matches:
+            matches = [row for row in rows if fuzzy_match(query, row[3])]
 
-            elif choice == "2":
-                status = input("Enter status: ")
-                if row[3].lower() == status.lower():
-                    print(row)
+    else:
+        print("❌ Invalid choice")
+        return
+
+    if not matches:
+        print("❌ No matching jobs found")
+        return
+
+    for row in matches:
+        print_job(row)
 
 
 # ============================================================
@@ -167,34 +233,34 @@ def search_job():
 
 def filter_jobs():
 
+    _, rows = read_jobs()
+
     print("\nFilter Jobs By:")
     print("1. Role")
     print("2. Location")
 
-    option = input("Choose option: ")
+    option = clean(input("Choose option: "))
 
-    with open("data/jobs.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader, None)
-        found = False
+    if option == "1":
+        print(f"Tip: e.g. {examples(rows, 1)}")
+        query = clean(input("Enter role: "))
+        matches = [row for row in rows if fuzzy_match(query, row[1])]
 
-        if option == "1":
-            role = input("Enter role: ").lower()
+    elif option == "2":
+        print(f"Tip: e.g. {examples(rows, 2)}")
+        query = clean(input("Enter location: "))
+        matches = [row for row in rows if fuzzy_match(query, row[2])]
 
-            for row in reader:
-                if role in row[1].lower():
-                    print(row)
-                    found = True
+    else:
+        print("❌ Invalid choice")
+        return
 
-        elif option == "2":
-            location = input("Enter location: ").lower()
+    if not matches:
+        print("❌ No matching jobs found")
+        return
 
-            for row in reader:
-                if location in row[2].lower():
-                    print(row)
-                    found = True
-        if not found:
-            print("❌ No matching jobs found")
+    for row in matches:
+        print_job(row)
 
 
 # ============================================================
@@ -219,33 +285,49 @@ def export_to_excel():
 # ============================================================
 
 def send_email_reminders():
-    load_dotenv()
-    sender_email = os.getenv("EMAIL_ADDRESS")
-    sender_password = os.getenv("EMAIL_PASSWORD")
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
+    sender_email = (os.getenv("EMAIL_ADDRESS") or "").strip()
+    # Gmail app passwords are shown with spaces; SMTP expects them removed
+    sender_password = (os.getenv("EMAIL_PASSWORD") or "").replace(" ", "")
 
     if not sender_email or not sender_password:
         print("❌ Email credentials missing")
         return
 
-    msg = EmailMessage()
-    msg["From"] = sender_email
-    msg["To"] = sender_email
-    msg["Subject"] = "Job Application Reminder"
-    body = "Follow up on these jobs:\n\n"
+    pending = []
 
     with open("data/jobs.csv", "r") as file:
         reader = csv.reader(file)
         next(reader, None)
 
         for row in reader:
-            if row[3].lower() == "applied":
-                body += f"{row[0]} | {row[1]} | {row[2]}\n"
+            row = [cell.strip() for cell in row]
+            if len(row) >= 4 and row[3].lower() == "applied":
+                pending.append(f"{row[0]} | {row[1]} | {row[2]}")
 
-    msg.set_content(body)
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-    print("📧 Reminder email sent")
+    if not pending:
+        print("No pending applications to remind about")
+        return
+
+    msg = EmailMessage()
+    msg["From"] = sender_email
+    msg["To"] = sender_email
+    msg["Subject"] = "Job Application Reminder"
+    msg.set_content("Follow up on these jobs:\n\n" + "\n".join(pending) + "\n")
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except smtplib.SMTPAuthenticationError:
+        print("❌ Gmail rejected the login. EMAIL_PASSWORD must be a Gmail App Password "
+              "(requires 2-Step Verification), not your normal password.")
+        return
+    except (smtplib.SMTPException, OSError) as e:
+        print(f"❌ Failed to send email: {e}")
+        return
+
+    print(f"📧 Reminder email sent ({len(pending)} jobs)")
 
 
 # ============================================================
@@ -269,7 +351,7 @@ if __name__ == "__main__":
         print("7 Send Reminder")
         print("8 Exit")
 
-        choice = input("Choose option: ")
+        choice = clean(input("Choose option: "))
 
         if choice == "1":
 
