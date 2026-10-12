@@ -35,3 +35,40 @@ Managing and coaching team members
 
 Post-graduation with a minimum of 2-5 years of experience.
 Experience and understanding of advanced analytical tools such as SAS, Python, PySpark, Big Data environments
+
+
+# appit
+
+Applied AI Engineer
+Deploy practical AI solutions at APPIT Software in Dubai, building intelligent automation, predictive analytics, and LLM-powered applications for enterprise clients across the Middle East.
+
+Dubai, UAE
+Full-time
+AI & Machine Learning
+Responsibilities
+Design and deploy AI solutions for enterprise clients in finance, real estate, and government sectors
+Build end-to-end ML pipelines from data collection to model deployment and monitoring
+Integrate LLM capabilities into existing enterprise workflows and applications
+Develop Arabic-English bilingual AI solutions for regional market needs
+Conduct technical demonstrations and proof-of-concept development for client engagements
+Optimize AI models for performance, cost, and compliance with regional data regulations
+Requirements
+3-5 years of applied AI/ML engineering experience
+Strong Python skills with experience in PyTorch, scikit-learn, and LLM frameworks
+Experience deploying ML models in production using cloud platforms (AWS, Azure, or GCP)
+Knowledge of AI application development for business process automation
+Understanding of data privacy regulations and ethical AI practices
+Excellent client-facing communication and presentation skills
+Nice to Have
+Experience with Arabic NLP and multilingual models
+Knowledge of UAE data protection regulations
+Prior experience working in the Middle East market
+Skills
+Python
+PyTorch
+LLMs
+Azure ML
+Docker
+REST APIs
+MLOps
+Bilingual NLP

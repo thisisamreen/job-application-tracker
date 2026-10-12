@@ -6,3 +6,8 @@ improvements.txt
 SKILLS.md
 data/private/
 data/output/
+creds/
+# Never commit Google service-account keys (even outside creds/)
+application-tracker*.json
+*-credentials.json
+**/service-account*.json
